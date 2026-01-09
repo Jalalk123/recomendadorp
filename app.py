@@ -16,7 +16,14 @@ st.markdown("""
     
     .stApp { background-color: #ffffff; }
 
-    /* Botones estilo dorado mate de tu imagen */
+    /* COLOR NEGRO PARA ETIQUETAS (Labels) */
+    data-testid="stWidgetLabel", .stSelectbox label, .stMultiSelect label {
+        color: #000000 !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+    }
+
+    /* Botones estilo dorado mate */
     .stButton > button {
         background-color: #b0965d !important;
         color: white !important;
@@ -46,9 +53,8 @@ def load_data():
     file_global = 'fra_cleaned_prueba_sincomas.csv'
     file_stock = 'stock_de_la_perfumeria.xlsx - Completo (1).csv'
     
-    # Verificación de existencia de archivos
     if not os.path.exists(file_global) or not os.path.exists(file_stock):
-        return None, None, f"Faltan archivos: {file_global if not os.path.exists(file_global) else ''} {file_stock if not os.path.exists(file_stock) else ''}"
+        return None, None, f"Faltan archivos"
 
     df_g = pd.read_csv(file_global)
     df_s = pd.read_csv(file_stock)
@@ -69,14 +75,9 @@ def load_data():
     indices = df_g[df_g['key'].isin(df_s['key'])].index.tolist()
     return df_g, indices, None
 
-# Ejecución principal
 df_global, indices_stock, error_msg = load_data()
 
-if error_msg:
-    st.error(error_msg)
-    st.info("Asegúrate de que los archivos CSV estén subidos a la raíz de tu repositorio de GitHub.")
-else:
-    # Vectorización
+if not error_msg:
     cv = CountVectorizer(tokenizer=lambda x: x.split(' '), token_pattern=None)
     matrix_bow = cv.fit_transform(df_global['notes_clean'])
 
@@ -85,6 +86,7 @@ else:
     st.markdown("<p style='text-align: center; color: #b0965d; font-weight: 300; font-size: 1.2rem;'>Todos tus perfumes en un solo lugar</p>", unsafe_allow_html=True)
     st.write("---")
 
+    # Los labels de estos selectbox ahora aparecerán en negro por el CSS arriba
     marca = st.selectbox("1. Selecciona la marca de referencia", sorted(df_global['brand'].unique()))
     perfumes_f = sorted(df_global[df_global['brand'] == marca]['perfume'].unique())
     perfume = st.selectbox("2. Elige el perfume que te gusta", perfumes_f)
