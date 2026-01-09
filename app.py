@@ -1,156 +1,120 @@
+import streamlit as st
 import pandas as pd
-import numpy as np
+import os
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.metrics.pairwise import cosine_similarity
-import gradio as gr
-import warnings
 
-# --- CONFIGURACIÓN Y MOTOR (Se mantiene igual) ---
-warnings.filterwarnings("ignore", category=UserWarning)
+# --- CONFIGURACIÓN DE PÁGINA ---
+st.set_page_config(page_title="Perfumería Real", layout="centered")
 
-try:
-    df_global = pd.read_csv('fra_cleaned_prueba_sincomas.csv')
-    df_stock_ref = pd.read_csv('stock_de_la_perfumeria.xlsx - Completo (1).csv')
-except FileNotFoundError:
-    print("⚠️ Error: Archivos no encontrados.")
+# --- DISEÑO DORADO MATE (Inspirado en tu imagen) ---
+st.markdown("""
+    <style>
+    @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
+    
+    html, body, [class*="css"] { font-family: 'Poppins', sans-serif; }
+    
+    .stApp { background-color: #ffffff; }
 
-def limpiar_notas(text):
-    if pd.isna(text): return ""
-    text = str(text).lower()
-    items_to_remove = ['[', ']', '"', '{', '}', 'middle: ', 'top: ', 'base: ', 'null']
-    for item in items_to_remove: text = text.replace(item, "")
-    return text.strip()
+    /* Botones estilo dorado mate de tu imagen */
+    .stButton > button {
+        background-color: #b0965d !important;
+        color: white !important;
+        border-radius: 6px !important;
+        padding: 0.7rem 2rem !important;
+        border: none !important;
+        width: 100% !important;
+        font-weight: 600 !important;
+        text-transform: uppercase;
+    }
+    
+    /* Tarjetas de perfumes */
+    .perfume-card {
+        border-left: 5px solid #b0965d;
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 0 10px 10px 0;
+        margin-bottom: 15px;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.05);
+    }
+    </style>
+    """, unsafe_allow_html=True)
 
-df_global['notes_clean'] = df_global['notes'].apply(limpiar_notas)
-df_global['brand'] = df_global['brand'].str.strip()
-df_global['perfume'] = df_global['perfume'].str.strip()
-df_global['key'] = df_global['brand'].str.lower() + "|" + df_global['perfume'].str.lower()
-df_stock_ref['key'] = df_stock_ref['brand'].str.strip().str.lower() + "|" + df_stock_ref['perfume'].str.strip().str.lower()
-indices_en_stock = df_global[df_global['key'].isin(df_stock_ref['key'])].index.tolist()
+# --- CARGA DE DATOS SEGURA ---
+@st.cache_data
+def load_data():
+    file_global = 'fra_cleaned_prueba_sincomas.csv'
+    file_stock = 'stock_de_la_perfumeria.xlsx - Completo (1).csv'
+    
+    # Verificación de existencia de archivos
+    if not os.path.exists(file_global) or not os.path.exists(file_stock):
+        return None, None, f"Faltan archivos: {file_global if not os.path.exists(file_global) else ''} {file_stock if not os.path.exists(file_stock) else ''}"
 
-cv = CountVectorizer(tokenizer=lambda x: x.split(' '), token_pattern=None)
-matrix_bow = cv.fit_transform(df_global['notes_clean'])
+    df_g = pd.read_csv(file_global)
+    df_s = pd.read_csv(file_stock)
+    
+    def limpiar(text):
+        if pd.isna(text): return ""
+        text = str(text).lower()
+        for item in ['[', ']', '"', '{', '}', 'middle: ', 'top: ', 'base: ', 'null']:
+            text = text.replace(item, "")
+        return text.strip()
 
-def update_perfumes(marca):
-    nombres = sorted(df_global[df_global['brand'] == marca]['perfume'].unique().tolist())
-    return gr.Dropdown(choices=nombres, value=None, interactive=True)
+    df_g['notes_clean'] = df_g['notes'].apply(limpiar)
+    df_g['brand'] = df_g['brand'].str.strip()
+    df_g['perfume'] = df_g['perfume'].str.strip()
+    df_g['key'] = df_g['brand'].str.lower() + "|" + df_g['perfume'].str.lower()
+    df_s['key'] = df_s['brand'].str.strip().str.lower() + "|" + df_s['perfume'].str.strip().str.lower()
+    
+    indices = df_g[df_g['key'].isin(df_s['key'])].index.tolist()
+    return df_g, indices, None
 
-def recomendar(marca_sel, perfume_sel):
-    if not marca_sel or not perfume_sel:
-        return pd.DataFrame({"Aviso": ["Selecciona marca y perfume"]})
-    try:
-        idx_base = df_global[(df_global['brand'] == marca_sel) & (df_global['perfume'] == perfume_sel)].index[0]
-        vector_base = matrix_bow[idx_base]
-        sims = cosine_similarity(vector_base, matrix_bow).flatten()
+# Ejecución principal
+df_global, indices_stock, error_msg = load_data()
+
+if error_msg:
+    st.error(error_msg)
+    st.info("Asegúrate de que los archivos CSV estén subidos a la raíz de tu repositorio de GitHub.")
+else:
+    # Vectorización
+    cv = CountVectorizer(tokenizer=lambda x: x.split(' '), token_pattern=None)
+    matrix_bow = cv.fit_transform(df_global['notes_clean'])
+
+    # --- INTERFAZ ---
+    st.markdown("<h1 style='text-align: center; color: #000; font-weight: 800; margin-bottom:0;'>Perfumeria Real</h1>", unsafe_allow_html=True)
+    st.markdown("<p style='text-align: center; color: #b0965d; font-weight: 300; font-size: 1.2rem;'>Todos tus perfumes en un solo lugar</p>", unsafe_allow_html=True)
+    st.write("---")
+
+    marca = st.selectbox("1. Selecciona la marca de referencia", sorted(df_global['brand'].unique()))
+    perfumes_f = sorted(df_global[df_global['brand'] == marca]['perfume'].unique())
+    perfume = st.selectbox("2. Elige el perfume que te gusta", perfumes_f)
+
+    if st.button("VER PRODUCTOS SIMILARES"):
+        idx_base = df_global[(df_global['brand'] == marca) & (df_global['perfume'] == perfume)].index[0]
+        sims = cosine_similarity(matrix_bow[idx_base], matrix_bow).flatten()
         
-        recomendaciones = []
-        for idx in indices_en_stock:
+        recoms = []
+        for idx in indices_stock:
             if idx == idx_base: continue
-            p_sim = sims[idx]
-            if p_sim > 0:
-                recomendaciones.append({
+            if sims[idx] > 0:
+                recoms.append({
                     'Marca': df_global.iloc[idx]['brand'].upper(),
                     'Perfume': df_global.iloc[idx]['perfume'],
-                    'Similitud_Val': p_sim,
-                    'Notas': df_global.iloc[idx]['notes_clean']
+                    'Similitud': sims[idx],
+                    'Notas': df_global.iloc[idx]['notes_clean'].replace(' ', ', ')
                 })
         
-        if not recomendaciones:
-            return pd.DataFrame({"Mensaje": ["No se encontraron similares en stock"]})
-
-        df_res = pd.DataFrame(recomendaciones).sort_values(by='Similitud_Val', ascending=False).head(7)
-        df_res['Similitud'] = df_res['Similitud_Val'].map("{:.0%}".format)
-        df_res['Notas'] = df_res['Notas'].str.replace(' ', ', ')
-        return df_res[['Marca', 'Perfume', 'Similitud', 'Notas']]
-    except Exception as e:
-        return pd.DataFrame({"Error": [str(e)]})
-
-# --- ESTILO "PERFUMERÍA REAL" (Basado en la imagen) ---
-
-css_custom = """
-@import url('https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;800&display=swap');
-
-body { background-color: #ffffff; font-family: 'Poppins', sans-serif; }
-.gradio-container { background-color: #ffffff !important; }
-
-/* Títulos */
-.title_container { text-align: center; margin-bottom: 30px; }
-.title_container h1 { font-weight: 800; font-size: 2.8rem; color: #000000; margin-bottom: 0; }
-.title_container p { font-weight: 300; color: #666; font-size: 1.1rem; }
-
-/* Botón Estilo Dorado Mate */
-.btn_gold { 
-    background-color: #b0965d !important; 
-    color: white !important; 
-    border-radius: 8px !important; 
-    border: none !important;
-    font-weight: 600 !important;
-    padding: 10px 20px !important;
-}
-.btn_gold:hover { background-color: #967f4a !important; }
-
-/* Inputs Estilo Imagen */
-.gr-input, .gr-dropdown {
-    border-radius: 6px !important;
-    border: 1px solid #ccc !important;
-    background-color: #fcfcfc !important;
-}
-
-/* Tabla de Resultados */
-.table-wrap { 
-    border: 2px solid #b0965d !important; 
-    border-radius: 10px !important; 
-    overflow: hidden !important;
-}
-thead th { 
-    background-color: #f7f1e3 !important; 
-    color: #000000 !important; 
-    font-weight: 700 !important;
-    text-transform: uppercase;
-}
-"""
-
-marcas_list = sorted(df_global['brand'].unique().tolist())
-
-with gr.Blocks(css=css_custom, title="Perfumería Real") as demo:
-    
-    # Header (Logotipo simulado y Menú)
-    with gr.Row():
-        gr.HTML("""
-            <div style="display: flex; justify-content: space-between; align-items: center; padding: 10px 0; border-bottom: 1px solid #eee;">
-                <div style="font-size: 24px; font-weight: 800; color: #000;">
-                    <span style="color: #b0965d; font-size: 32px;">P</span>R Perfumeria Real
+        if recoms:
+            df_res = pd.DataFrame(recoms).sort_values(by='Similitud', ascending=False).head(5)
+            st.markdown("### ✨ Recomendaciones encontradas en Stock:")
+            for _, row in df_res.iterrows():
+                st.markdown(f"""
+                <div class="perfume-card">
+                    <h3 style="margin:0; color:#b0965d;">{row['Perfume']}</h3>
+                    <p style="margin:0; font-weight:600; color:#333;">{row['Marca']}</p>
+                    <p style="font-size: 0.9rem; color: #666; margin-top:10px;"><b>Notas olfativas:</b> {row['Notas']}</p>
+                    <p style="text-align:right; font-size:0.8rem; color:#b0965d; margin:0;">Coincidencia: {row['Similitud']:.0%}</p>
                 </div>
-                <div style="display: flex; gap: 20px; color: #666; font-weight: 400;">
-                    <span>Inicio</span><span>Productos</span><span>Contacto</span>
-                </div>
-            </div>
-        """)
-
-    with gr.Column(elem_classes="title_container"):
-        gr.Markdown("# Descubre tu Aroma Perfecto")
-        gr.Markdown("Encuentra la fragancia ideal en nuestra colección exclusiva")
-
-    with gr.Row():
-        with gr.Column(scale=1):
-            gr.Markdown("### 1. Selecciona la marca")
-            drop_marca = gr.Dropdown(choices=marcas_list, label=None, container=False)
-            
-            gr.Markdown("### 2. Elige el perfume")
-            drop_perfume = gr.Dropdown(choices=[], label=None, container=False, interactive=True)
-            
-            btn = gr.Button("BUSCAR SIMILARES", elem_classes="btn_gold")
-        
-        with gr.Column(scale=2):
-            out_table = gr.Dataframe(
-                headers=["Marca", "Perfume", "Similitud", "Notas"],
-                interactive=False,
-                wrap=True
-            )
-
-    # Lógica de interacción
-    drop_marca.change(fn=update_perfumes, inputs=drop_marca, outputs=drop_perfume)
-    btn.click(fn=recomendar, inputs=[drop_marca, drop_perfume], outputs=out_table)
-
-if __name__ == "__main__":
-    demo.launch()
+                """, unsafe_allow_html=True)
+        else:
+            st.warning("No encontramos fragancias similares en stock actualmente.")
