@@ -16,12 +16,15 @@ st.markdown("""
     
     .stApp { background-color: #ffffff; }
 
-    /* COLOR NEGRO PARA ETIQUETAS (Labels) */
-    data-testid="stWidgetLabel", .stSelectbox label, .stMultiSelect label {
-        color: #000000 !important;
-        font-weight: 600 !important;
-        font-size: 1rem !important;
-    }
+   /* COLOR NEGRO SOLO PARA LOS LABELS DE SELECTBOX */
+[data-testid="stWidgetLabel"] label,
+.stSelectbox label,
+.stMultiSelect label {
+    color: #000000 !important;
+    font-weight: 600 !important;
+    font-size: 1rem !important;
+}
+
 
     /* Botones estilo dorado mate */
     .stButton > button {
@@ -120,3 +123,4 @@ if not error_msg:
                 """, unsafe_allow_html=True)
         else:
             st.warning("No encontramos fragancias similares en stock actualmente.")
+
