@@ -111,7 +111,11 @@ if not error_msg:
         
         if recoms:
             df_res = pd.DataFrame(recoms).sort_values(by='Similitud', ascending=False).head(5)
-            st.markdown("### ✨ Recomendaciones encontradas en Stock:")
+            st.markdown(
+    "<h3 style='color:#000000;'>✨ Recomendaciones encontradas en Stock:</h3>",
+    unsafe_allow_html=True
+)
+
             for _, row in df_res.iterrows():
                 st.markdown(f"""
                 <div class="perfume-card">
@@ -123,4 +127,5 @@ if not error_msg:
                 """, unsafe_allow_html=True)
         else:
             st.warning("No encontramos fragancias similares en stock actualmente.")
+
 
